@@ -1,21 +1,17 @@
 ORG 0
 BITS 16                 ; tell the assembler we are using a 16 bit architecture (because we are in real mode)
 
+
 _start:
     jmp short start
     nop
 
+
 times 33 db 0           ; allocate space for Bios Parameter Block and fill it with 0s
+
 
 start:
     jmp 0x7c0:begin_process
-
-handle_zero:
-    mov ah, 0x0e
-    mov al, 'A'
-    mov bx, 0
-    int 0x10
-    iret
 
 
 begin_process:
@@ -29,15 +25,25 @@ begin_process:
     mov sp, 0x7c00      ; set the stack pointer to 0
     sti                 ; enable interrupts
 
-    mov word [ss:0], handle_zero    ; move handle_zero (offset) into first byte of ram using stack segment register (ss = 0, offset = 0)
-    mov word [ss:0x02], 0x7c0       ; move the data segment (instruction location) into memory
-    int 0                           ; call the interrupt
+    ; we are going to try to call a disk read interrupt to read the text message
+    mov ah, 0x02    ; read sector command
+    mov al, 0x01    ; reading 1 sector
+    mov ch, 0x00    ; set the cylinder number to 0
+    mov cl, 0x02    ; we want to read sector 2 (sectors start at 1)
+    mov bx, buffer  ; bx is our message
+    int 0x13        ; call interrupt now that parameters are set
+
+    jc error        ; if the error flag is set, jump to error
+    mov si, buffer  ; print our buffer
+    call print
+    jmp $           ; infinite jump
 
 
-
-    mov si, message     ; move the address of the label 'message' into the si register
+error:
+    mov si, error_message
     call print
     jmp $
+
 
 print:
     mov ah, 0x0e        ; set us up for printing bios routine
@@ -55,7 +61,12 @@ print_char:
     int 0x10            ; call bios routine to output the character and move cursor
     ret
 
-message: db 'Hello World!', 0   ; store the string at the memeory location of 'message'
+
+error_message: db 'Failed to load sector', 0
+
 
 times 510-($ - $$) db 0         ; pad unused data with 0s
 dw 0xAA55                       ; write the boot signature (written backwards due to little endianness)
+
+
+buffer: 
