@@ -1,7 +1,25 @@
-ORG 0x7C00  ; our bootloader gets loaded into this address by BIOS, so this is the address we want to originate from
-BITS 16     ; tell the assembler we are using a 16 bit architecture (because we are in real mode)
+ORG 0
+BITS 16                 ; tell the assembler we are using a 16 bit architecture (because we are in real mode)
+
+_start:
+    jmp short start
+    nop
+
+times 33 db 0           ; allocate space for Bios Parameter Block and fill it with 0s
 
 start:
+    jmp 0x7c0:begin_process
+
+begin_process:
+    cli                 ; clear & disable interrupts
+    ; set segment registers how we want them instead of letting BIOS do it
+    mov ax, 0x7c0
+    mov ds, ax
+    mov es, ax
+    mov ax, 0
+    mov ss, ax          ; set the stack segment to 0
+    mov sp, 0x7c00      ; set the stack pointer to 0x7c00
+    sti                 ; enable interrupts
     mov si, message     ; move the address of the label 'message' into the si register
     call print
     jmp $
@@ -24,5 +42,5 @@ print_char:
 
 message: db 'Hello World!', 0   ; store the string at the memeory location of 'message'
 
-times 510-($ - $$) db 0     ; pad unused data with 0s
-dw 0xAA55                   ; write the boot signature (written backwards due to little endianness)
+times 510-($ - $$) db 0         ; pad unused data with 0s
+dw 0xAA55                       ; write the boot signature (written backwards due to little endianness)
