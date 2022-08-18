@@ -10,6 +10,14 @@ times 33 db 0           ; allocate space for Bios Parameter Block and fill it wi
 start:
     jmp 0x7c0:begin_process
 
+handle_zero:
+    mov ah, 0x0e
+    mov al, 'A'
+    mov bx, 0
+    int 0x10
+    iret
+
+
 begin_process:
     cli                 ; clear & disable interrupts
     ; set segment registers how we want them instead of letting BIOS do it
@@ -18,8 +26,15 @@ begin_process:
     mov es, ax
     mov ax, 0
     mov ss, ax          ; set the stack segment to 0
-    mov sp, 0x7c00      ; set the stack pointer to 0x7c00
+    mov sp, 0x7c00      ; set the stack pointer to 0
     sti                 ; enable interrupts
+
+    mov word [ss:0], handle_zero    ; move handle_zero (offset) into first byte of ram using stack segment register (ss = 0, offset = 0)
+    mov word [ss:0x02], 0x7c0       ; move the data segment (instruction location) into memory
+    int 0                           ; call the interrupt
+
+
+
     mov si, message     ; move the address of the label 'message' into the si register
     call print
     jmp $
