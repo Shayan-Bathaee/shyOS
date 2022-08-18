@@ -1,3 +1,3 @@
 
 # shyOS
-[IN PROGRESS] Multithreaded operating system developed from scratc
+[IN PROGRESS] Multithreaded operating system developed from scratch
