@@ -1,5 +1,9 @@
-ORG 0
+ORG 0x7c00
 BITS 16                 ; tell the assembler we are using a 16 bit architecture (because we are in real mode)
+
+
+CODE_SEG equ gdt_code - gdt_start   ; get the offset for protected mode code seg and data seg
+DATA_SEG equ gdt_data - gdt_start
 
 
 _start:
@@ -11,58 +15,75 @@ times 33 db 0           ; allocate space for Bios Parameter Block and fill it wi
 
 
 start:
-    jmp 0x7c0:begin_process
+    jmp 0:begin_process
 
 
 begin_process:
     cli                 ; clear & disable interrupts
     ; set segment registers how we want them instead of letting BIOS do it
-    mov ax, 0x7c0
+    mov ax, 0
     mov ds, ax
     mov es, ax
-    mov ax, 0
     mov ss, ax          ; set the stack segment to 0
     mov sp, 0x7c00      ; set the stack pointer to 0
     sti                 ; enable interrupts
 
-    ; we are going to try to call a disk read interrupt to read the text message
-    mov ah, 0x02    ; read sector command
-    mov al, 0x01    ; reading 1 sector
-    mov ch, 0x00    ; set the cylinder number to 0
-    mov cl, 0x02    ; we want to read sector 2 (sectors start at 1)
-    mov bx, buffer  ; bx is our message
-    int 0x13        ; call interrupt now that parameters are set
 
-    jc error        ; if the error flag is set, jump to error
-    mov si, buffer  ; print our buffer
-    call print
-    jmp $           ; infinite jump
+load_protected: 
+    cli
+    lgdt[gdt_descriptor]    ; load global descriptor table
+    mov eax, cr0            ; set control register to 1
+    or eax, 0x01
+    mov cr0, eax
+    jmp CODE_SEG:load32     ; switch to code selector and jummp to code segment
 
 
-error:
-    mov si, error_message
-    call print
-    jmp $
+; GDT
+gdt_start:
+
+gdt_null:
+    dd 0
+    dd 0
+
+; offset 0x08
+gdt_code:       ; CS should point to this. This is our 32 bit protected mode code segment
+    dw 0xffff   ; segment limit first 0-15 bits
+    dw 0        ; base first 0-15 bits
+    db 0        ; base 16-23 bits
+    db 0x9a     ; access byte (set bit fields)
+    db 0b11001111 ; high and low 4 bit flags
+    db 0        ; base 24-31 bits
+
+; offset 0x10
+gdt_data:       ; DS, SS, ES, FS, GS should point to this. This is our 32 bit protected mode data segment
+    dw 0xffff   ; segment limit first 0-15 bits
+    dw 0        ; base first 0-15 bits
+    db 0        ; base 16-23 bits
+    db 0x92     ; access byte (set bit fields)
+    db 0b11001111 ; high and low 4 bit flags
+    db 0        ; base 24-31 bits
+
+gdt_end: 
 
 
-print:
-    mov ah, 0x0e        ; set us up for printing bios routine
-.loop_string:
-    lodsb               ; load the next character into al
-    cmp al, 0           ; check if the character = 0
-    je .done            ; jump on equal to done
-    call print_char     ; print char if it is not 0
-    jmp .loop_string    ; jump back to get the next character
-.done:
-    ret
+gdt_descriptor:       ; size and offset of the global descriptor table
+    dw gdt_end - gdt_start - 1
+    dd gdt_start
 
 
-print_char:
-    int 0x10            ; call bios routine to output the character and move cursor
-    ret
+[BITS 32]   ; code below this is 32 bits
+load32: 
+    mov ax, DATA_SEG    ; set data registers to 32 bit data segement
+    mov es, ax
+    mov ds, ax
+    mov ss, ax
+    mov fs, ax
+    mov gs, ax
+    mov ebp, 0x200000   ; set base pointer
+    mov esp, ebp        ; set the stack pointer to the base pointer
+    
+    jmp $   ; infinite jump
 
-
-error_message: db 'Failed to load sector', 0
 
 
 times 510-($ - $$) db 0         ; pad unused data with 0s
