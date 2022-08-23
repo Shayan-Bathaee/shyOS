@@ -81,6 +81,11 @@ load32:
     mov gs, ax
     mov ebp, 0x200000   ; set base pointer
     mov esp, ebp        ; set the stack pointer to the base pointer
+
+    in al, 0x92         ; enable the A20 Line
+    or al, 2
+    out 0x92, al
+
     
     jmp $   ; infinite jump
 
