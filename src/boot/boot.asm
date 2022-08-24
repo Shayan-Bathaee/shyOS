@@ -35,7 +35,7 @@ load_protected:
     mov eax, cr0            ; set control register to 1
     or eax, 0x01
     mov cr0, eax
-    jmp CODE_SEG:load32     ; switch to code selector and jummp to code segment
+    jmp CODE_SEG:0x0100000   ; switch to code selector and jummp to code segment
 
 
 ; GDT
@@ -71,24 +71,67 @@ gdt_descriptor:       ; size and offset of the global descriptor table
     dd gdt_start
 
 
-[BITS 32]   ; code below this is 32 bits
-load32: 
-    mov ax, DATA_SEG    ; set data registers to 32 bit data segement
-    mov es, ax
-    mov ds, ax
-    mov ss, ax
-    mov fs, ax
-    mov gs, ax
-    mov ebp, 0x200000   ; set base pointer
-    mov esp, ebp        ; set the stack pointer to the base pointer
+[BITS 32]
+load32: ; read our kernel using LBA and load it into memory and then jump to it
+    mov eax, 1          ; starting sector we want to load from (1, because 0 is the bootloader)
+    mov ecx, 100        ; total number of sectors we want to load (matches Makefile)
+    mov edi, 0x100000   ; address we want to load them into (1MB, matches linker)
+    call ata_lba_read
 
-    in al, 0x92         ; enable the A20 Line
-    or al, 2
-    out 0x92, al
-
+ata_lba_read: ; driver to read from disk (will be used to load kernel)
+    mov ebx, eax,       ; backup the LBA
     
-    jmp $   ; infinite jump
+    ; send highest 8 bits of the lba to hard disk controller
+    shr eax, 24         ; shift right eax 24
+    or eax, 0xe0        ; select the master drive
+    mov dx, 0x1f6
+    out dx, al
 
+    ; send the total sectors to the hard disk controller
+    mov eax, ecx
+    mov dx, 0x1f2
+    out dx, al
+
+    ; send more bits of the LBA
+    mov eax, ebx        ; restore backup lba
+    mov dx, 0x1f3
+    out dx, al
+
+    ; send more bits of the LBA
+    mov dx, 0x1f4
+    mov eax, ebx        ; restore the backup LBA
+    shr eax, 8          ; shift right eax 8
+    out dx, al
+
+    ; send upper 16 bits of the LBA
+    mov dx, 0x1f5
+    mov eax, ebx        ; restore the backup LBA
+    shr eax, 16
+    out dx, al
+
+    mov dx, 0x1f7
+    mov al, 0x20
+    out dx, al
+
+    ; Read all sectors into memory
+.next_sector:
+    push ecx
+
+; checking if we need to read
+.try_again:
+    mov dx, 0x1f7       ; read from port 0x1f7 into the al register
+    in al, dx
+    test al, 8
+    jz .try_again
+
+    ; need to read 256 words at a time (512 bytes)
+    mov ecx, 256
+    mov dx, 0x1f0
+    rep insw            ; read a word from the port dx and store it into 0x100000 256 times
+    pop ecx
+    loop .next_sector
+    ; end of reading sectors into memory
+    ret
 
 
 times 510-($ - $$) db 0         ; pad unused data with 0s
