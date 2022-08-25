@@ -1,4 +1,5 @@
 #include "kernel.h"
+#include "idt/idt.h"
 #include <stdint.h>
 #include <stddef.h>
 
@@ -72,8 +73,13 @@ void print(const char* str) {
 }
 
 
+
+
 void kernel_main() {
     terminal_initialize();
     print("Hello World!\nThis is a new line");
+
+    // initialize the interrupt descriptor table
+    idt_init();
     return;
 }

@@ -22,4 +22,5 @@ _start:
     call kernel_main    ; call function in kernel.c
     jmp $   ; infinite jump
 
+
 times 512-($ - $$) db 0 ; align
