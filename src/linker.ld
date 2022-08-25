@@ -3,25 +3,31 @@ OUTPUT_FORMAT(binary)   /* keep things simple for now, output as binary */
 SECTIONS
 {
     . = 1M;             /* our kernel must be loaded into 1 megabyte of memory */
-    .text : 
+    
+    .text : ALIGN(4096)
     {
         *(.text)
     }
 
-    .rodata :
+    .rodata : ALIGN(4096)
     {
         *(.rodata)
     }
 
-    .data :
+    .data : ALIGN(4096)
     {
         *(.data)
     }
 
-    .bss :
+    .bss : ALIGN(4096)
     {
         *(COMMON)
         *(.bss)
+    }
+
+    .asm : ALIGN(4096)
+    {
+        *(.asm)
     }
 
 }
