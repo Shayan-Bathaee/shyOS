@@ -2,6 +2,7 @@
 #include "idt/idt.h"
 #include <stdint.h>
 #include <stddef.h>
+#include <io/io.h>
 
 // global variables
 uint16_t* video_mem = 0;     // for VGA text mode addressing
@@ -81,5 +82,7 @@ void kernel_main() {
 
     // initialize the interrupt descriptor table
     idt_init();
+
+    outb(0x60, 0xff);
     return;
 }
